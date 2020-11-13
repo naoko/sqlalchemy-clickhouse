@@ -90,6 +90,9 @@ def create_ad_hoc_field(cls, db_type):
 
     if db_type == 'LowCardinality(Nullable(FixedString(3)))':
         db_type = 'String'
+    
+    if db_type == 'LowCardinality(FixedString(3))':
+        db_type = 'String'
 
     if db_type.startswith('DateTime'):
         db_type = 'DateTime'
