@@ -5,6 +5,7 @@
 # Many docstrings in this file are based on the PEP, which is in the public domain.
 
 from __future__ import absolute_import
+from six import PY3, string_types
 from __future__ import unicode_literals
 import re
 import uuid
@@ -16,7 +17,8 @@ from datetime import datetime
 # PEP 249 module globals
 apilevel = '2.0'
 threadsafety = 2  # Threads may share the module and connections.
-paramstyle = 'pyformat'  # Python extended format codes, e.g. ...WHERE name=%(name)s
+# Python extended format codes, e.g. ...WHERE name=%(name)s
+paramstyle = 'pyformat'
 
 # Python 2/3 compatibility
 try:
@@ -24,11 +26,13 @@ try:
 except NameError:
     basestring = str
 
+
 class Error(Exception):
     """Exception that is the base class of all other error exceptions.
     You can use this to catch all errors with one single except statement.
     """
     pass
+
 
 class ParamEscaper(object):
     def escape_args(self, parameters):
@@ -63,19 +67,22 @@ class ParamEscaper(object):
         else:
             raise Exception("Unsupported object {}".format(item))
 
+
 _escaper = ParamEscaper()
 
 # Patch ORM library
+
+
 @classmethod
 def create_ad_hoc_field(cls, db_type):
     import infi.clickhouse_orm.fields as orm_fields
 
     # Enums
     if db_type.startswith('Enum'):
-        db_type = 'String' # enum.Eum is not comparable
+        db_type = 'String'  # enum.Eum is not comparable
     # Arrays
     if db_type.startswith('Array'):
-        inner_field = cls.create_ad_hoc_field(db_type[6 : -1])
+        inner_field = cls.create_ad_hoc_field(db_type[6: -1])
         return orm_fields.ArrayField(inner_field)
     # FixedString
     if db_type.startswith('FixedString'):
@@ -90,59 +97,72 @@ def create_ad_hoc_field(cls, db_type):
 
     if db_type == 'LowCardinality(Nullable(FixedString(3)))':
         db_type = 'String'
-    
+
     if db_type == 'LowCardinality(FixedString(3))':
         db_type = 'String'
+
+    if db_type == 'LowCardinality(UInt8)':
+        db_type = 'UInt8'
 
     if db_type.startswith('DateTime'):
         db_type = 'DateTime'
 
     if db_type.startswith('Nullable'):
-        inner_field = cls.create_ad_hoc_field(db_type[9 : -1])
+        inner_field = cls.create_ad_hoc_field(db_type[9: -1])
         return orm_fields.NullableField(inner_field)
-   
+
     # db_type for Deimal comes like 'Decimal(P, S) string where P is precision and S is scale'
     if db_type.startswith('Decimal'):
         nums = [int(n) for n in db_type[8:-1].split(',')]
         return orm_fields.DecimalField(nums[0], nums[1])
-    
+
     # Simple fields
     name = db_type + 'Field'
     if not hasattr(orm_fields, name):
         raise NotImplementedError('No field class for %s' % db_type)
     return getattr(orm_fields, name)()
+
+
 ModelBase.create_ad_hoc_field = create_ad_hoc_field
 
-from six import PY3, string_types
+
 def _send(self, data, settings=None, stream=False):
     if PY3 and isinstance(data, string_types):
         data = data.encode('utf-8')
     params = self._build_params(settings)
-    r = self.request_session.post(self.db_url, params=params, data=data, stream=stream, timeout=self.timeout)
+    r = self.request_session.post(
+        self.db_url, params=params, data=data, stream=stream, timeout=self.timeout)
     if r.status_code != 200:
         raise Exception(r.text)
     return r
+
+
 Database._send = _send
 
 #
 # Connector interface
 #
 
+
 def connect(*args, **kwargs):
     return Connection(*args, **kwargs)
+
 
 class Connection(Database):
     """
         These objects are small stateless factories for cursors, which do all the real work.
     """
+
     def __init__(self, db_name, db_url='http://localhost:8123/', username=None, password=None, readonly=False, ssl="False"):
         if ssl.upper() == "TRUE":
             db_url = db_url.replace("http", "https")
         elif ssl.upper() == "FALSE":
             pass
         else:
-            raise ValueError("Not Supported value of ssl parameter, only True/False values are accepted")
-        super(Connection, self).__init__(db_name, db_url, username, password, readonly)
+            raise ValueError(
+                "Not Supported value of ssl parameter, only True/False values are accepted")
+        super(Connection, self).__init__(
+            db_name, db_url, username, password, readonly)
         self.db_name = db_name
         self.db_url = db_url
         self.username = username
@@ -159,7 +179,9 @@ class Connection(Database):
         return Cursor(self)
 
     def rollback(self):
-        raise NotSupportedError("Transactions are not supported")  # pragma: no cover
+        raise NotSupportedError(
+            "Transactions are not supported")  # pragma: no cover
+
 
 class Cursor(object):
     """These objects represent a database cursor, which is used to manage the context of a fetch
@@ -358,7 +380,7 @@ class Cursor(object):
             assert self._state == self._STATE_FINISHED, "Query should be finished"
             return
         # Replace current running query to cancel it
-        self._db.select("SELECT 1", settings={"query_id":self._uuid})
+        self._db.select("SELECT 1", settings={"query_id": self._uuid})
         self._state = self._STATE_FINISHED
         self._uuid = None
         self._data = None
