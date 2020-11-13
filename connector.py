@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 #!/usr/bin/env python
 #
 # See http://www.python.org/dev/peps/pep-0249/
@@ -6,7 +7,6 @@
 
 from __future__ import absolute_import
 from six import PY3, string_types
-from __future__ import unicode_literals
 import re
 import uuid
 import requests
